@@ -7,6 +7,7 @@ import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
+import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
@@ -22,7 +23,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.lang.annotation.Annotation;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -41,17 +42,21 @@ import static javax.lang.model.element.Modifier.*;
  * This annotation processor is run at compile time to find classes annotated with {@link JsonType}.
  * Deserializers are generated for such classes.
  */
+@SupportedOptions({"generateSerializers"})
 public class JsonAnnotationProcessor extends AbstractProcessor {
   private Messager mMessager;
   private Elements mElements;
   private Types mTypes;
   private Filer mFiler;
   private TypeUtils mTypeUtils;
+
+  private boolean mGenerateSerializers;
+
   private static class State {
     private Map<TypeElement, JsonParserClassData> mClassElementToInjectorMap;
 
     State() {
-      mClassElementToInjectorMap = new HashMap<TypeElement, JsonParserClassData>();
+      mClassElementToInjectorMap = new LinkedHashMap<>();
     }
   }
   private State mState;
@@ -65,6 +70,13 @@ public class JsonAnnotationProcessor extends AbstractProcessor {
     mTypes = env.getTypeUtils();
     mFiler = env.getFiler();
     mTypeUtils = new TypeUtils(mTypes, mMessager);
+
+    Map<String, String> options = env.getOptions();
+    mGenerateSerializers = toBooleanDefaultTrue(options.get("generateSerializers"));
+  }
+
+  private boolean toBooleanDefaultTrue(String value) {
+    return value == null || !value.equalsIgnoreCase("false");
   }
 
   @Override
@@ -83,6 +95,8 @@ public class JsonAnnotationProcessor extends AbstractProcessor {
 
   @Override
   public boolean process(Set<? extends TypeElement> elements, RoundEnvironment env) {
+    Console.reportErrors(env, processingEnv.getMessager());
+
     try {
       // each round of processing requires a clean state.
       mState = new State();
@@ -176,10 +190,16 @@ public class JsonAnnotationProcessor extends AbstractProcessor {
         superclass = superclassElement.getSuperclass();
       }
 
+
+      boolean generateSerializer = annotation.generateSerializer() == JsonType.TriState.DEFAULT ?
+              mGenerateSerializers :
+              annotation.generateSerializer() == JsonType.TriState.YES;
+
       String packageName = mTypeUtils.getPackageName(mElements, typeElement);
       injector = new JsonParserClassData(
           packageName,
           typeElement.getQualifiedName().toString(),
+          mTypeUtils.getClassName(typeElement, packageName),
           mTypeUtils.getPrefixForGeneratedClass(typeElement, packageName) +
               JsonAnnotationProcessorConstants.HELPER_CLASS_SUFFIX,
           new ProcessorClassData.AnnotationRecordFactory<String, TypeData>() {
@@ -190,8 +210,9 @@ public class JsonAnnotationProcessor extends AbstractProcessor {
             }
           },
           abstractClass,
-          annotation.postprocessingEnabled(),
-          parentGeneratedClassName);
+          generateSerializer,
+          parentGeneratedClassName,
+          annotation);
       mState.mClassElementToInjectorMap.put(typeElement, injector);
     }
   }
@@ -235,6 +256,7 @@ public class JsonAnnotationProcessor extends AbstractProcessor {
     JsonField annotation = element.getAnnotation(JsonField.class);
 
     data.setFieldName(annotation.fieldName());
+    data.setAlternateFieldNames(annotation.alternateFieldNames());
     data.setMapping(annotation.mapping());
     data.setValueExtractFormatter(annotation.valueExtractFormatter());
     data.setAssignmentFormatter(annotation.fieldAssignmentFormatter());
@@ -254,19 +276,26 @@ public class JsonAnnotationProcessor extends AbstractProcessor {
       TypeElement typeElement = (TypeElement) declaredType.asElement();
 
       String packageName = mTypeUtils.getPackageName(mElements, typeElement);
-      String className = mTypeUtils.getClassName(typeElement, packageName);
-      String parserClassName = mTypeUtils.getPrefixForGeneratedClass(typeElement, packageName);
 
-      data.setParsableType(packageName + "." + className);
-      data.setParsableTypeParserClass(packageName + "." + parserClassName);
+      data.setPackageName(packageName);
+      data.setParsableType(mTypeUtils.getClassName(typeElement, packageName));
+      data.setParsableTypeParserClass(
+          mTypeUtils.getPrefixForGeneratedClass(typeElement, packageName));
+
+      if (StringUtil.isNullOrEmpty(data.getValueExtractFormatter())) {
+        // Use the parsable object's value extract formatter
+        data.setValueExtractFormatter(
+            typeElement.getAnnotation(JsonType.class).valueExtractFormatter());
+      }
     } else if (data.getParseType() == TypeUtils.ParseType.ENUM_OBJECT) {
       // verify that we have value extract and serializer formatters.
       if (StringUtil.isNullOrEmpty(annotation.valueExtractFormatter()) ||
-          StringUtil.isNullOrEmpty(annotation.serializeCodeFormatter())) {
+          (injector.generateSerializer() && StringUtil.isNullOrEmpty(annotation.serializeCodeFormatter()))) {
         error(element,
-            "%s: enums must have both value extract formatters and serialize code formatters",
+            "%s: enums must have a value extract formatter, and a serialize code formatter if serialization generation is enabled",
             enclosingElement);
       }
+      data.setEnumType(type.toString());
     }
   }
 
@@ -285,10 +314,13 @@ public class JsonAnnotationProcessor extends AbstractProcessor {
 
     Annotation annotation = enclosingElement.getAnnotation(JsonType.class);
     if (annotation == null) {
-      error(enclosingElement,
+      error(
+          enclosingElement,
           "@%s field may only be contained in classes annotated with @%s (%s.%s)",
-          annotationClass.getSimpleName(), JsonField.class.toString(),
-          enclosingElement.getQualifiedName(), element.getSimpleName());
+          annotationClass.getSimpleName(),
+          JsonType.class.toString(),
+          enclosingElement.getQualifiedName(),
+          element.getSimpleName());
       return false;
     }
 

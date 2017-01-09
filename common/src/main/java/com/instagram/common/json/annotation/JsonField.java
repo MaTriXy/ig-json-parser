@@ -6,13 +6,13 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 import static java.lang.annotation.ElementType.FIELD;
-import static java.lang.annotation.RetentionPolicy.CLASS;
+import static java.lang.annotation.RetentionPolicy.SOURCE;
 
 /**
  * Apply this to a field in a class annotated with {@link JsonType}.  This tells the annotation
  * processor which fields exist, and how they may to/from the json object.
  */
-@Retention(CLASS) @Target(FIELD)
+@Retention(SOURCE) @Target(FIELD)
 public @interface JsonField {
   /**
    * This controls how we deal with type mismatches.  If a {@link TypeMapping#EXACT} mapping is
@@ -32,6 +32,12 @@ public @interface JsonField {
   String fieldName();
 
   /**
+   * Alternate field names which should be parsed to the same field. Only used during
+   * deserialization.
+   */
+  String [] alternateFieldNames() default {};
+
+  /**
    * This controls how we deal with type mismatches.  Note that this is ignored if
    * {@link #valueExtractFormatter()} is specified.
    * @see TypeMapping
@@ -46,6 +52,11 @@ public @interface JsonField {
    *   <tr>
    *     <th>parser_object</th>
    *     <td>the instance of {@link JsonParser} being read from
+   *   </tr>
+   *   <tr>
+   *     <th>subobject_class</th>
+   *     <td>when parsing a subobject, this refers to the subobject type.
+   *     </td>
    *   </tr>
    *   <tr>
    *     <th>subobject_helper_class</th>

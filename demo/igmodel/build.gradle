@@ -1,12 +1,25 @@
-apply plugin: 'java'
+apply plugin: 'com.android.library'
+apply plugin: 'com.neenbedankt.android-apt'
 
-compileJava {
-  options.compilerArgs += [
-                       '-processor',
-                       'com.instagram.common.json.annotation.processor.JsonAnnotationProcessor'
-  ]
-}
 dependencies {
+  apt project(':processor')
   compile project(':common')
-  compile project(':processor')
+}
+
+android {
+  compileSdkVersion 23
+  buildToolsVersion "23.0.1"
+  sourceCompatibility = 1.7
+  targetCompatibility = 1.7
+
+  sourceSets {
+    main {
+      manifest {
+        srcFile "AndroidManifest.xml"
+      }
+      java {
+        srcDir 'src/main/java'
+      }
+    }
+  }
 }

@@ -6,11 +6,10 @@ import javax.annotation.processing.Messager;
 
 import java.io.IOException;
 import java.io.StringWriter;
-import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Map;
 
-import com.squareup.javawriter.JavaWriter;
+import com.instagram.javawriter.JavaWriter;
 
 import static javax.lang.model.element.Modifier.FINAL;
 import static javax.lang.model.element.Modifier.PUBLIC;
@@ -34,9 +33,13 @@ import static javax.lang.model.element.Modifier.STATIC;
 public class TypeGathererClassData extends ProcessorClassData<String, FieldData> {
   private TypeGathererClassData mParentClassData;
 
-  public TypeGathererClassData(String classPackage, String className, String injectedClassName,
+  public TypeGathererClassData(
+      String classPackage,
+      String qualifiedClassName,
+      String simpleClassName,
+      String injectedClassName,
       AnnotationRecordFactory<String, FieldData> factory) {
-    super(classPackage, className, injectedClassName, factory);
+    super(classPackage, qualifiedClassName, simpleClassName, injectedClassName, factory);
   }
 
   @Override
@@ -47,8 +50,8 @@ public class TypeGathererClassData extends ProcessorClassData<String, FieldData>
     try {
       writer.emitPackage(mClassPackage)
           .beginType(mInjectedClassName, "class", EnumSet.of(PUBLIC, FINAL))
-            .beginMethod("void", "injectTypeData", EnumSet.of(PUBLIC, FINAL, STATIC),
-                mClassName, "instance")
+            .beginMethod("void", "injectTypeData", EnumSet.of(PUBLIC, STATIC),
+                mSimpleClassName, "instance")
               .emitWithGenerator(new JavaWriter.JavaGenerator() {
                 @Override
                 public void emitJava(JavaWriter writer) throws IOException {

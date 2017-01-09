@@ -1,2 +1,5 @@
 .gradle
+.idea
 build
+gen-src
+*.iml

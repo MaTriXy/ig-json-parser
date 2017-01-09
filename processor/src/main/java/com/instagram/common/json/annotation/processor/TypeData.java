@@ -3,20 +3,79 @@
 package com.instagram.common.json.annotation.processor;
 
 import com.instagram.common.json.annotation.JsonField;
+import com.instagram.common.json.annotation.JsonType;
 import com.instagram.common.json.annotation.util.TypeUtils;
 
 /**
- * Represents the data needed to serialize and deserialize a field.
+ * Represents the data needed to serialize and deserialize a field. These roughly correspond
+ * to the attributes of the JsonField annotation.
  */
 class TypeData {
+
+  /**
+   * {@link JsonField#fieldName()}
+   */
   private String mFieldName;
+
+  /**
+   * {@link JsonField#alternateFieldNames()}
+   */
+  private String[] mAlternateFieldNames;
+
+  /**
+   * {@link JsonField#mapping()}
+   */
   private JsonField.TypeMapping mMapping;
+
+  /**
+   * {@link JsonField#valueExtractFormatter()}
+   */
   private String mValueExtractFormatter;
+
+  /**
+   * {@link JsonField#fieldAssignmentFormatter()}
+   */
   private String mAssignmentFormatter;
+
+  /**
+   * {@link JsonField#serializeCodeFormatter()}
+   */
   private String mSerializeCodeFormatter;
+
+  /**
+   * The collection type of the field, if the field is a collection, otherwise it is set to
+   * {@link TypeUtils.CollectionType#NOT_A_COLLECTION}
+   */
   private TypeUtils.CollectionType mCollectionType;
+
+  /**
+   * The parse type of the field. This is either the
+   * <p>
+   * 1) the generic type if the field is a collection<br/>
+   * 2) an internal type that we know how to parse<br/>
+   * 3) parsable object, if it refers to an object that is annotated with {@link JsonType}
+   *
+   */
   private TypeUtils.ParseType mParseType;
+
+  /**
+   * If this is a parsable object, the package name for this field's class.
+   */
+  private String mPackageName;
+
+  /**
+   * If this is a parsable object, the name of this field's class.
+   */
   private String mParsableType;
+
+  /**
+   * If this is an enum, the name of this field's enum.
+   */
+  private String mEnumType;
+
+  /**
+   * If this is a parsable object, the name of this field's parser class.
+   */
   private String mParsableTypeParserClass;
 
   String getFieldName() {
@@ -25,6 +84,14 @@ class TypeData {
 
   void setFieldName(String fieldName) {
     this.mFieldName = fieldName;
+  }
+
+  public String[] getAlternateFieldNames() {
+    return mAlternateFieldNames;
+  }
+
+  public void setAlternateFieldNames(String[] alternateFieldNames) {
+    mAlternateFieldNames = alternateFieldNames;
   }
 
   JsonField.TypeMapping getMapping() {
@@ -75,6 +142,14 @@ class TypeData {
     mParseType = parseType;
   }
 
+  public String getPackageName() {
+    return mPackageName;
+  }
+
+  public void setPackageName(String packageName) {
+    mPackageName = packageName;
+  }
+
   String getParsableType() {
     return mParsableType;
   }
@@ -89,5 +164,13 @@ class TypeData {
 
   void setParsableTypeParserClass(String parsableTypeParserClass) {
     mParsableTypeParserClass = parsableTypeParserClass;
+  }
+
+  String getEnumType() {
+    return mEnumType;
+  }
+
+  void setEnumType(String enumType) {
+    mEnumType = enumType;
   }
 }
