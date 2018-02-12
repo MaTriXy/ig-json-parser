@@ -129,6 +129,10 @@ public @interface JsonField {
    *   <li>
    *     ${subobject_helper_class}: the class that is responsible for serializing the current field
    *   </li>
+   *   <li>
+   *     ${subobject}: reference to the subobject being parsed. Equivalent to either
+   *     ${object_varname}.${field_varname} or ${iterator}, depending on context.
+   *   </li>
    * </ul>
    * <p/>
    * The formatting tokens are not always valid, depending on the nature of the field being

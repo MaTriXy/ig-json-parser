@@ -35,7 +35,11 @@ import com.instagram.common.json.annotation.util.Console;
 import com.instagram.common.json.annotation.util.ProcessorClassData;
 import com.instagram.common.json.annotation.util.TypeUtils;
 
+import static com.instagram.common.json.annotation.processor.CodeFormatter.FIELD_ASSIGNMENT;
+import static com.instagram.common.json.annotation.processor.CodeFormatter.FIELD_CODE_SERIALIZATION;
+import static com.instagram.common.json.annotation.processor.CodeFormatter.VALUE_EXTRACT;
 import static javax.lang.model.element.ElementKind.CLASS;
+import static javax.lang.model.element.ElementKind.INTERFACE;
 import static javax.lang.model.element.Modifier.*;
 
 /**
@@ -51,6 +55,7 @@ public class JsonAnnotationProcessor extends AbstractProcessor {
   private TypeUtils mTypeUtils;
 
   private boolean mGenerateSerializers;
+  private boolean mOmitSomeMethodBodies;
 
   private static class State {
     private Map<TypeElement, JsonParserClassData> mClassElementToInjectorMap;
@@ -73,10 +78,16 @@ public class JsonAnnotationProcessor extends AbstractProcessor {
 
     Map<String, String> options = env.getOptions();
     mGenerateSerializers = toBooleanDefaultTrue(options.get("generateSerializers"));
+    mOmitSomeMethodBodies = toBooleanDefaultFalse(options.get(
+        "com.facebook.buck.java.generating_abi"));
   }
 
   private boolean toBooleanDefaultTrue(String value) {
     return value == null || !value.equalsIgnoreCase("false");
+  }
+
+  private boolean toBooleanDefaultFalse(String value) {
+    return value != null && value.equalsIgnoreCase("true");
   }
 
   @Override
@@ -102,7 +113,10 @@ public class JsonAnnotationProcessor extends AbstractProcessor {
       mState = new State();
 
       gatherClassAnnotations(env);
-      gatherFieldAnnotations(env);
+      if (!mOmitSomeMethodBodies) {
+        // Field annotations are only needed if we're generating method bodies.
+        gatherFieldAnnotations(env);
+      }
 
       for (Map.Entry<TypeElement, JsonParserClassData> entry :
           mState.mClassElementToInjectorMap.entrySet()) {
@@ -156,6 +170,12 @@ public class JsonAnnotationProcessor extends AbstractProcessor {
     boolean abstractClass = false;
     TypeElement typeElement = (TypeElement) element;
 
+    // The annotation should be validated for an interface, but no code should be generated.
+    JsonType annotation = element.getAnnotation(JsonType.class);
+    if (element.getKind() == INTERFACE) {
+      return;
+    }
+
     // Verify containing class visibility is not private.
     if (element.getModifiers().contains(PRIVATE)) {
       error(element, "@%s %s may not be applied to private classes. (%s.%s)",
@@ -169,25 +189,27 @@ public class JsonAnnotationProcessor extends AbstractProcessor {
 
     JsonParserClassData injector = mState.mClassElementToInjectorMap.get(typeElement);
     if (injector == null) {
-      JsonType annotation = element.getAnnotation(JsonType.class);
 
       String parentGeneratedClassName = null;
 
-      TypeMirror superclass = typeElement.getSuperclass();
-      // walk up the superclass hierarchy until we find another class we know about.
-      while (superclass.getKind() != TypeKind.NONE) {
-        TypeElement superclassElement = (TypeElement) mTypes.asElement(superclass);
+      if (!mOmitSomeMethodBodies) {
+        // Superclass info is only needed if we're generating method bodies.
+        TypeMirror superclass = typeElement.getSuperclass();
+        // walk up the superclass hierarchy until we find another class we know about.
+        while (superclass.getKind() != TypeKind.NONE) {
+          TypeElement superclassElement = (TypeElement) mTypes.asElement(superclass);
 
-        if (superclassElement.getAnnotation(JsonType.class) != null) {
-          String superclassPackageName = mTypeUtils.getPackageName(mElements, superclassElement);
-          parentGeneratedClassName = superclassPackageName + "." +
-              mTypeUtils.getPrefixForGeneratedClass(superclassElement, superclassPackageName) +
-              JsonAnnotationProcessorConstants.HELPER_CLASS_SUFFIX;
+          if (superclassElement.getAnnotation(JsonType.class) != null) {
+            String superclassPackageName = mTypeUtils.getPackageName(mElements, superclassElement);
+            parentGeneratedClassName = superclassPackageName + "." +
+                mTypeUtils.getPrefixForGeneratedClass(superclassElement, superclassPackageName) +
+                JsonAnnotationProcessorConstants.HELPER_CLASS_SUFFIX;
 
-          break;
+            break;
+          }
+
+          superclass = superclassElement.getSuperclass();
         }
-
-        superclass = superclassElement.getSuperclass();
       }
 
 
@@ -211,6 +233,7 @@ public class JsonAnnotationProcessor extends AbstractProcessor {
           },
           abstractClass,
           generateSerializer,
+          mOmitSomeMethodBodies,
           parentGeneratedClassName,
           annotation);
       mState.mClassElementToInjectorMap.put(typeElement, injector);
@@ -258,9 +281,12 @@ public class JsonAnnotationProcessor extends AbstractProcessor {
     data.setFieldName(annotation.fieldName());
     data.setAlternateFieldNames(annotation.alternateFieldNames());
     data.setMapping(annotation.mapping());
-    data.setValueExtractFormatter(annotation.valueExtractFormatter());
-    data.setAssignmentFormatter(annotation.fieldAssignmentFormatter());
-    data.setSerializeCodeFormatter(annotation.serializeCodeFormatter());
+    data.setValueExtractFormatter(
+        VALUE_EXTRACT.forString(annotation.valueExtractFormatter()));
+    data.setAssignmentFormatter(
+        FIELD_ASSIGNMENT.forString(annotation.fieldAssignmentFormatter()));
+    data.setSerializeCodeFormatter(
+        FIELD_CODE_SERIALIZATION.forString(annotation.serializeCodeFormatter()));
     TypeUtils.CollectionType collectionType = mTypeUtils.getCollectionType(type);
     data.setCollectionType(collectionType);
 
@@ -282,11 +308,19 @@ public class JsonAnnotationProcessor extends AbstractProcessor {
       data.setParsableTypeParserClass(
           mTypeUtils.getPrefixForGeneratedClass(typeElement, packageName));
 
-      if (StringUtil.isNullOrEmpty(data.getValueExtractFormatter())) {
-        // Use the parsable object's value extract formatter
-        data.setValueExtractFormatter(
-            typeElement.getAnnotation(JsonType.class).valueExtractFormatter());
-      }
+      JsonType typeAnnotation = typeElement.getAnnotation(JsonType.class);
+      // Use the parsable object's value extract formatter if existing one is empty
+      data.setValueExtractFormatter(data.getValueExtractFormatter()
+        .orIfEmpty(VALUE_EXTRACT.forString(typeAnnotation.valueExtractFormatter())));
+
+      CodeFormatter.Factory serializeCodeType = typeElement.getKind() == INTERFACE
+          ? CodeFormatter.CLASS_CODE_SERIALIZATION
+          : CodeFormatter.INTERFACE_CODE_SERIALIZATION;
+      data.setSerializeCodeFormatter(data.getSerializeCodeFormatter()
+          .orIfEmpty(serializeCodeType.forString(typeAnnotation.serializeCodeFormatter())));
+
+      data.setIsInterface(typeElement.getKind() == INTERFACE);
+      data.setFormatterImports(typeAnnotation.typeFormatterImports());
     } else if (data.getParseType() == TypeUtils.ParseType.ENUM_OBJECT) {
       // verify that we have value extract and serializer formatters.
       if (StringUtil.isNullOrEmpty(annotation.valueExtractFormatter()) ||
