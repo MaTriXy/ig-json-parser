@@ -1,4 +1,22 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
 buildscript {
+    ext.kotlin_version = '1.3.61'
+
+    repositories {
+        google()
+        mavenCentral()
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:3.2.1'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
 }
 
 apply plugin: 'groovy'
@@ -8,57 +26,55 @@ apply plugin: 'maven-publish'
 group = "com.github.instagram"
 version = 0.8
 
-task wrapper(type: Wrapper) {
-       gradleVersion = '4.1' //version required
-}
-
 subprojects {
-  repositories {
-    mavenCentral()
-  }
+    repositories {
+        google()
+        mavenCentral()
+        jcenter()
+    }
 }
 
 if (JavaVersion.current().isJava8Compatible()) {
-  allprojects {
-    tasks.withType(Javadoc) {
-      options.addStringOption('Xdoclint:none', '-quiet')
+    allprojects {
+        tasks.withType(Javadoc) {
+            options.addStringOption('Xdoclint:none', '-quiet')
+        }
     }
-  }
 }
 
 task processorJar(type: Jar,
-        dependsOn:["javawriter:build","common:build","util:build","processor:build"]) {
-    from files( { project(':javawriter').sourceSets.main.output.classesDir } )
-    from files( { project(':common').sourceSets.main.output.classesDir } )
-    from files( { project(':util').sourceSets.main.output.classesDir } )
-    from files( { project(':processor').sourceSets.main.output.classesDir } )
-    from files( { project(':processor').sourceSets.main.output.resourcesDir } )
+        dependsOn: ["javawriter:build", "common:build", "util:build", "processor:build"]) {
+    from files({ project(':javawriter').sourceSets.main.output.classesDir })
+    from files({ project(':common').sourceSets.main.output.classesDir })
+    from files({ project(':util').sourceSets.main.output.classesDir })
+    from files({ project(':processor').sourceSets.main.output.classesDir })
+    from files({ project(':processor').sourceSets.main.output.resourcesDir })
     baseName 'processor'
 }
 
 task runtimeJar(type: Jar,
         dependsOn: "common:build") {
-    from files( { project(':common').sourceSets.main.output.classesDir } )
+    from files({ project(':common').sourceSets.main.output.classesDir })
     baseName 'runtime'
 }
 
 task runtimeSourcesJar(type: Jar) {
     classifier = 'sources'
     baseName 'runtime'
-    from files( { project(':common').sourceSets.main.allJava } )
+    from files({ project(':common').sourceSets.main.allJava })
 }
 
 task processorSourcesJar(type: Jar) {
     classifier = 'sources'
     baseName 'processor'
-    from files( { project(':javawriter').sourceSets.main.allJava } )
-    from files( { project(':common').sourceSets.main.allJava } )
-    from files( { project(':util').sourceSets.main.allJava } )
-    from files( { project(':processor').sourceSets.main.allJava } )
+    from files({ project(':javawriter').sourceSets.main.allJava })
+    from files({ project(':common').sourceSets.main.allJava })
+    from files({ project(':util').sourceSets.main.allJava })
+    from files({ project(':processor').sourceSets.main.allJava })
 }
 
 task runtimeJavadoc(type: Javadoc) {
-    source files( { project(':common').sourceSets.main.allJava } )
+    source files({ project(':common').sourceSets.main.allJava })
     destinationDir = new File("${project.docsDir}", "runtime-javadoc")
 }
 
@@ -69,10 +85,10 @@ task runtimeJavadocJar(type: Jar, dependsOn: runtimeJavadoc) {
 }
 
 task processorJavadoc(type: Javadoc) {
-    source files( { project(':javawriter').sourceSets.main.allJava } )
-    source files( { project(':common').sourceSets.main.allJava } )
-    source files( { project(':util').sourceSets.main.allJava } )
-    source files( { project(':processor').sourceSets.main.allJava } )
+    source files({ project(':javawriter').sourceSets.main.allJava })
+    source files({ project(':common').sourceSets.main.allJava })
+    source files({ project(':util').sourceSets.main.allJava })
+    source files({ project(':processor').sourceSets.main.allJava })
     destinationDir = new File("${project.docsDir}", "processor-javadoc")
     classpath += files({ project(':common').sourceSets.main.compileClasspath })
     classpath += files({ project(':processor').sourceSets.main.compileClasspath })

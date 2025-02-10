@@ -1,11 +1,21 @@
-// Copyright 2004-present Facebook. All Rights Reserved.
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
 
 package com.instagram.common.json.annotation.util;
 
+import static javax.lang.model.element.ElementKind.CLASS;
+import static javax.lang.model.element.ElementKind.INTERFACE;
+
+import java.lang.annotation.Annotation;
+import java.util.EnumSet;
+import java.util.List;
 import javax.annotation.Nullable;
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.type.DeclaredType;
@@ -14,16 +24,7 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 
-import java.lang.annotation.Annotation;
-import java.util.EnumSet;
-import java.util.List;
-
-import static javax.lang.model.element.ElementKind.CLASS;
-import static javax.lang.model.element.ElementKind.INTERFACE;
-
-/**
- * Utility functions to get the declared types of fields.
- */
+/** Utility functions to get the declared types of fields. */
 public class TypeUtils {
 
   public enum ParseType {
@@ -41,6 +42,7 @@ public class TypeUtils {
     STRING,
     PARSABLE_OBJECT,
     ENUM_OBJECT,
+    WILDCARD,
   }
 
   public enum CollectionType {
@@ -79,7 +81,7 @@ public class TypeUtils {
   }
 
   public ParseType getParseType(
-      TypeMirror typeMirror, Class<? extends Annotation> typeAnnotationClass) {
+      TypeMirror typeMirror, @Nullable Class<? extends Annotation> typeAnnotationClass) {
     if (typeMirror == null) {
       return ParseType.UNSUPPORTED;
     } else if (JAVA_LANG_STRING.equals(typeMirror.toString())) {
@@ -104,11 +106,15 @@ public class TypeUtils {
       return ParseType.DOUBLE;
     } else if (JAVA_LANG_DOUBLE.equals(typeMirror.toString())) {
       return ParseType.DOUBLE_OBJECT;
+    } else if (typeMirror.getKind() == TypeKind.WILDCARD) {
+      // If it's a wildcard, assume that annotations are added to properly parse it.
+      return ParseType.PARSABLE_OBJECT;
     } else if (typeMirror instanceof DeclaredType) {
       DeclaredType type = (DeclaredType) typeMirror;
       Element element = type.asElement();
 
-      Annotation annotation = element.getAnnotation(typeAnnotationClass);
+      Annotation annotation =
+          typeAnnotationClass != null ? element.getAnnotation(typeAnnotationClass) : null;
       if (annotation != null && EnumSet.of(CLASS, INTERFACE).contains(element.getKind())) {
         return ParseType.PARSABLE_OBJECT;
       }
@@ -154,7 +160,7 @@ public class TypeUtils {
    * If {@code typeMirror} represents a list type ({@link java.util.List}), attempt to divine the
    * type of the contents.
    *
-   * Returns null if {@code typeMirror} does not represent a list type or if we cannot divine the
+   * <p>Returns null if {@code typeMirror} does not represent a list type or if we cannot divine the
    * type of the contents.
    */
   @Nullable
@@ -171,10 +177,10 @@ public class TypeUtils {
     List<? extends TypeParameterElement> typeParameterElements = typeElement.getTypeParameters();
     List<TypeMirror> typeArguments = (List<TypeMirror>) declaredType.getTypeArguments();
 
-    if (JAVA_UTIL_QUEUE.equals(getCanonicalTypeName(declaredType)) ||
-        JAVA_UTIL_LIST.equals(getCanonicalTypeName(declaredType)) ||
-        JAVA_UTIL_ARRAYLIST.equals(getCanonicalTypeName(declaredType)) ||
-        JAVA_UTIL_SET.equals(getCanonicalTypeName(declaredType))) {
+    if (JAVA_UTIL_QUEUE.equals(getCanonicalTypeName(declaredType))
+        || JAVA_UTIL_LIST.equals(getCanonicalTypeName(declaredType))
+        || JAVA_UTIL_ARRAYLIST.equals(getCanonicalTypeName(declaredType))
+        || JAVA_UTIL_SET.equals(getCanonicalTypeName(declaredType))) {
       // sanity check.
       if (typeParameterElements.size() != 1) {
         throw new IllegalStateException(
@@ -198,8 +204,8 @@ public class TypeUtils {
   }
 
   /**
-   * This returns the class name of the type as one would use to reference in code.  For most cases,
-   * this is pretty straightforward.  Inner classes are used with . notation, i.e., if class Y is an
+   * This returns the class name of the type as one would use to reference in code. For most cases,
+   * this is pretty straightforward. Inner classes are used with . notation, i.e., if class Y is an
    * inner class of class X, then class Y's class name should be X.Y.
    */
   public String getClassName(TypeElement type, String packageName) {
@@ -208,12 +214,12 @@ public class TypeUtils {
   }
 
   /**
-   * This returns the prefix used to refer to the generated class.  This is different because we
-   * generate individual source files for each inner class.  For instance, if we have class X with
+   * This returns the prefix used to refer to the generated class. This is different because we
+   * generate individual source files for each inner class. For instance, if we have class X with
    * inner classes Y and Z, then we generate three source files.
-   * <p/>
-   * To make this work, we replace the normal dot notation between an outer class and an inner class
-   * with a '_', i.e., the generated class for class X will be X_Y&lt;suffix&gt;.
+   *
+   * <p>To make this work, we replace the normal dot notation between an outer class and an inner
+   * class with a '_', i.e., the generated class for class X will be X_Y&lt;suffix&gt;.
    */
   @Nullable
   public String getPrefixForGeneratedClass(TypeElement type, String packageName) {
@@ -230,10 +236,10 @@ public class TypeUtils {
   }
 
   /**
-   * Returns a string with type parameters replaced with wildcards.  This is slightly different from
+   * Returns a string with type parameters replaced with wildcards. This is slightly different from
    * {@link Types#erasure(javax.lang.model.type.TypeMirror)}, which removes all type parameter data.
    *
-   * For instance, if there is a field with type List&lt;String&gt;, this returns a string
+   * <p>For instance, if there is a field with type List&lt;String&gt;, this returns a string
    * List&lt;?&gt;.
    */
   private String getCanonicalTypeName(DeclaredType declaredType) {

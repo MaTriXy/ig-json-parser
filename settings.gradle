@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
 include 'javawriter'
 include 'util'
 include 'util:testprocessor'
@@ -10,5 +17,7 @@ include 'processor:testuut:parent'
 include 'processor:testuut:dependent'
 include 'processor:testuut:noserializers'
 include 'processor:testuut:nobodies'
+include 'processor:testuut:kotlin'
+include 'processor:testuut:strict'
 include 'demo'
 include 'demo:igmodel'

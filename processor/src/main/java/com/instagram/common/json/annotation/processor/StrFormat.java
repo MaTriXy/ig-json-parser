@@ -1,16 +1,18 @@
-// Copyright 2004-present Facebook. All Rights Reserved.
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
 
 package com.instagram.common.json.annotation.processor;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-
 import org.apache.commons.lang3.text.StrSubstitutor;
 
-/**
- * Syntactic sugar wrapper for {@link StrSubstitutor}.
- */
+/** Syntactic sugar wrapper for {@link StrSubstitutor}. */
 class StrFormat {
   private final String mFormatString;
   private final Map<String, String> mInternalMap;
@@ -18,7 +20,7 @@ class StrFormat {
 
   private StrFormat(String formatString, Set<String> supportedTokens) {
     mFormatString = formatString;
-    mInternalMap = new HashMap<String, String>();
+    mInternalMap = new HashMap<>();
     mSupportedTokens = supportedTokens;
   }
 
@@ -34,8 +36,6 @@ class StrFormat {
   }
 
   static StrFormat createStringFormatter(CodeFormatter formatter) {
-    return new StrFormat(
-        formatter.getFormatterString(),
-        formatter.getSupportedTokens());
+    return new StrFormat(formatter.getFormatterString(), formatter.getSupportedTokens());
   }
 }

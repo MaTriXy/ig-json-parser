@@ -1,15 +1,18 @@
-// Copyright 2004-present Facebook. All Rights Reserved.
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
 
 package com.instagram.common.json.annotation.processor.uut;
+
+import static com.instagram.common.json.annotation.JsonField.TypeMapping.EXACT;
 
 import com.instagram.common.json.annotation.JsonField;
 import com.instagram.common.json.annotation.JsonType;
 
-import static com.instagram.common.json.annotation.JsonField.TypeMapping.*;
-
-/**
- * UUT for testing the {@link JsonField.TypeMapping#EXACT} mapping.
- */
+/** UUT for testing the {@link JsonField.TypeMapping#EXACT} mapping. */
 @JsonType
 public class ExactMappingUUT {
   public static final String BOOLEAN_FIELD_NAME = "boolean";
